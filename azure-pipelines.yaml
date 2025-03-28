@@ -1,0 +1,41 @@
+trigger:
+  - master
+
+resources:
+  repositories:
+    - repository: templates
+      type: git
+      name: devops/platform-azdevops-templates
+      ref: refs/heads/main
+
+variables:
+  dockerRegistryServiceConnection: 'Digital Ocean'
+  containerRegistry: 'registry.digitalocean.com/x-com-react'
+  repositoryName: 'x-com-react'
+  dockerfile: '**/Dockerfile'
+
+stages:
+  - stage: Calculate_Version
+    displayName: "Calculate Semantic Version"
+    jobs:
+      - template: ci/semver.yaml@templates
+  - stage: Build_And_Push
+    displayName: "Build and Push Docker Images"
+    jobs:
+      - job: Build_Push
+        displayName: "Build and Push Image"
+        steps:
+          - template: ci/build_and_push_images.yaml@templates
+            parameters:
+              dockerRegistryServiceConnection: $(dockerRegistryServiceConnection)
+              containerRegistry: $(containerRegistry)
+              repositoryName: $(repositoryName)
+              dockerfile: $(dockerfile)
+              semver: $(Build.BuildNumber)
+  - stage: Deploy_to_K8s
+    displayName: "Deploy to K8s"
+    jobs:
+      - job: Deploy_to_K8s
+        displayName: "Deploy to K8s"
+        steps:
+          - template: ci/deploy-k8s.yaml@templates
