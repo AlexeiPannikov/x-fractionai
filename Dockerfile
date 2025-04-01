@@ -1,45 +1,31 @@
-# Stage 1: Build the application
+# --- Stage 1: Build Next.js Static Site ---
 FROM node:18 AS builder
 
-# Set the working directory inside the container
 WORKDIR /app
 
-# Copy package.json and package-lock.json
-COPY package.json package-lock.json ./
-
-# Install dependencies
+# Copy necessary files and install dependencies
+COPY package*.json ./
 RUN npm install
 
-# Copy the rest of the application code
+# Copy the rest of the app (Next.js source code, config, pages, etc.)
 COPY . .
 
-# Build the application
-RUN npm run build
+# Build static site using `output: 'export'`
+RUN npm run build && mv out/index.html out/site.html
 
-# Install only production dependencies
-RUN npm prune --production
+# --- Stage 2: PHP Apache server ---
+FROM php:8.2-apache
 
-# Stage 2: Serve the built application
-FROM node:18 AS runner
+# Install dependencies for PHP extensions
+RUN apt-get update && apt-get install -y \
+    libcurl4-openssl-dev \
+    && docker-php-ext-install curl \
+    && rm -rf /var/lib/apt/lists/*
 
-# Set the working directory inside the container
-WORKDIR /app
+# Copy PHP files
+COPY index.php /var/www/html/
 
-# Copy the built application and production dependencies from the builder stage
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/node_modules ./node_modules
+# Copy Next.js static output from the previous stage
+COPY --from=builder /app/out/ /var/www/html/
 
-# Expose the application port
-EXPOSE 3000
-
-# Default environment to production
-ENV NODE_ENV=production
-
-# Define a health check (optional)
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s \
-  CMD curl -f http://localhost:3000 || exit 1
-
-# Start the application with Next.js
-CMD ["npx", "next", "start", "-p", "3000"]
+WORKDIR /var/www/html

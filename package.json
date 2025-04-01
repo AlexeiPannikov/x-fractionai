@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "NEXT_LOG_LEVEL=debug next build",
+    "serve": "npx serve out",
     "start": "next start",
     "lint": "next lint"
   },
